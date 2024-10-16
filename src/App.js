@@ -2,7 +2,7 @@ import Login from "./components/auth/login";
 //import Register from "./components/auth/register";
 
 //import Header from "./components/header";
-//import Home from "./components/home";
+import ChatBox from "./components/chat-box";
 
 import { AuthProvider } from "./contexts/authContext";
 import { useRoutes } from "react-router-dom";
@@ -24,7 +24,7 @@ function App() {
     },
     {
       path: "/home",
-     // element: <Home />,
+      element: <ChatBox />,
     },
   ];
   // let because we want the value to change no like the const 
