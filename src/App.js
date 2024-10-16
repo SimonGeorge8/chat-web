@@ -1,6 +1,5 @@
 import Login from "./components/auth/login";
-//import Register from "./components/auth/register";
-
+import Register from "./components/auth/register";
 //import Header from "./components/header";
 import ChatBox from "./components/chat-box";
 
@@ -20,7 +19,7 @@ function App() {
     },
     {
       path: "/register",
-      //element: <Register />,
+      element: <Register />,
     },
     {
       path: "/home",
