@@ -1,16 +1,44 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../contexts/authContext';
+import { doCreateUserWithEmailandPassword, doSignInWithEmailandPassword, doSignInWithGoogle } from '../../../firebase/auth';
 
 
 
 const Login = ({ onLogin, onRegister, onGoogleLogin }) => {
-  const handleSubmit = (e) => {
+
+    const navigate = useNavigate();
+    const { userLoggedIn } = useAuth()
+
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [isSigningIn , setisSigningIn ] = useState(false)
+    const [errorMessage, seErrorMessaage]  = useState('')
+
+
+  const onSubmit = async (e) => {
     e.preventDefault();
-    if (onLogin) onLogin();
+    if (!isSigningIn) {
+      setisSigningIn(true)
+      await doSignInWithEmailandPassword( email , password )
+    }
+  };
+
+
+  const onGoogleSignIn = async (e) => {
+    e.preventDefault();
+    if (!isSigningIn) {
+      setisSigningIn(true)
+      doSignInWithGoogle().catch( err => {
+        setisSigningIn(false)
+      })
+    }
   };
 
   return (
     <div className="relative min-h-screen bg-gray-900 flex items-center justify-center p-8">
+        {userLoggedIn && (<Navigate to={'/home'} replace={true} />)}
       {/* Chat Background Card */}
       <div className="absolute inset-0 flex justify-center items-center p-8">
         <div className="bg-black/30 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-md p-6">
@@ -45,12 +73,14 @@ const Login = ({ onLogin, onRegister, onGoogleLogin }) => {
         <div className="card-body">
           <h2 className="text-3xl font-bold text-center mb-8 text-white">Login</h2>
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-6" onSubmit={onSubmit}>
             {/* Email Field */}
             <label className="flex items-center gap-3 p-4 bg-white/5 rounded-full">
               <Mail size={20} className="text-white/60" />
               <input
                 type="text"
+                required
+                value = {email} onChange={(e) => {setEmail(e.target.value)}}
                 className="flex-grow bg-transparent text-white placeholder-white/40 focus:outline-none"
                 placeholder="Email"
               />
@@ -61,6 +91,8 @@ const Login = ({ onLogin, onRegister, onGoogleLogin }) => {
               <Lock size={20} className="text-white/60" />
               <input
                 type="password"
+                required
+                value = {password} onChange={(e) => {setPassword(e.target.value)}}
                 className="flex-grow bg-transparent text-white placeholder-white/40 focus:outline-none"
                 placeholder="Password"
               />
@@ -96,7 +128,7 @@ const Login = ({ onLogin, onRegister, onGoogleLogin }) => {
               Forgot password?
             </a>
             <button
-              onClick={onRegister}
+              onClick={ () => navigate('/register')}
               className="text-white/60 hover:text-white transition-colors duration-200 bg-transparent border-none cursor-pointer"
             >
               Create account

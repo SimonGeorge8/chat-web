@@ -25,6 +25,14 @@ function App() {
       path: "/home",
       element: <ChatBox />,
     },
+    {
+      path: "/home/recent-chats",
+      element: <ChatBox />,
+    },
+    {
+      path: "/home/new-chats",
+      element: <ChatBox />,
+    },
   ];
   // let because we want the value to change no like the const 
   let routesElement = useRoutes(routesArray);

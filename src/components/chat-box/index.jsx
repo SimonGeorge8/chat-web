@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState } from 'react';
-import { Home, Search, PieChart, BellDot, Settings, MessageSquare, Send, Sun, Moon } from 'lucide-react';
+import { Home, Search, PieChart, BellDot, Settings, MessageSquare, Send, Sun, Moon, LogOut } from 'lucide-react';
+import { useAuth } from '../../contexts/authContext';
+import { useNavigate, Navigate } from 'react-router-dom';
+import { doSignOut } from '../../firebase/auth';
 
 const ThemeContext = createContext();
 
@@ -16,16 +19,15 @@ export const useTheme = () => useContext(ThemeContext);
 
 const Notification = ({ onClose, message = "You have an unread message" }) => {
   const { isDark } = useTheme();
-  
   return (
     <div role="alert" 
       className={`fixed top-4 right-4 z-50 flex items-center gap-4 p-4 rounded-lg shadow-lg
-        ${isDark ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}`}>
+        ${isDark ? 'bg-black/30 backdrop-blur-xl' : 'bg-white/90'} text-white`}>
       <svg 
         xmlns="http://www.w3.org/2000/svg" 
         fill="none" 
         viewBox="0 0 24 24" 
-        className={`h-6 w-6 shrink-0 ${isDark ? 'stroke-blue-400' : 'stroke-blue-500'}`}
+        className="h-6 w-6 shrink-0 stroke-blue-400"
       >
         <path 
           strokeLinecap="round" 
@@ -40,11 +42,8 @@ const Notification = ({ onClose, message = "You have an unread message" }) => {
       </div>
       <button
         onClick={onClose}
-        className={`ml-4 px-2 py-1 rounded-lg text-sm font-medium
-          ${isDark 
-            ? 'bg-gray-700 hover:bg-gray-600' 
-            : 'bg-gray-200 hover:bg-gray-300'} 
-          transition-colors`}
+        className="ml-4 px-2 py-1 rounded-lg text-sm font-medium
+          bg-white/10 hover:bg-white/20 transition-colors"
       >
         X
       </button>
@@ -73,42 +72,44 @@ const IconButton = ({ icon, onClick, badge }) => {
 
 const Sidebar = ({ onNotificationClick, notificationCount }) => {
   const { isDark } = useTheme();
+  const navigate = useNavigate();
   
   return (
     <div className={`fixed left-4 top-1/2 transform -translate-y-1/2 
-      ${isDark ? 'bg-gray-800/80' : 'bg-white/80'} 
-      backdrop-blur-xl shadow-lg rounded-full p-3 w-16 flex flex-col items-center space-y-8 z-50`}>
+      ${isDark ? 'bg-black/30 backdrop-blur-xl' : 'bg-white/90'} 
+      shadow-lg rounded-2xl p-3 w-16 flex flex-col items-center space-y-8 z-50`}>
       <nav className="flex flex-col space-y-8">
         <IconButton icon={<Home size={20} />} />
         <IconButton icon={<Search size={20} />} />
-        <IconButton icon={<PieChart size={20} />} />
         <IconButton 
           icon={<BellDot size={20} />} 
           onClick={onNotificationClick}
           badge={notificationCount > 0 ? notificationCount : null}
         />
         <IconButton icon={<Settings size={20} />} />
+        <IconButton 
+          icon={<LogOut size={20} />}
+          onClick={() => { doSignOut().then(() => { navigate('/login') }) }}
+        />
       </nav>
     </div>
   );
 };
 
-// Other components remain the same
 const MessageList = ({ messages }) => {
   const { isDark } = useTheme();
-
   return (
-    <div className="space-y-6 mb-4 h-[calc(100vh-300px)] overflow-y-auto">
+    <div className="space-y-6 mb-4 h-[calc(100vh-400px)] overflow-y-auto px-4">
       {messages.map((msg) => (
         <div key={msg.id} className={`flex ${msg.sender === 'Bob' ? 'justify-end' : 'justify-start'}`}>
           <div className={`max-w-xs ${
             msg.sender === 'Bob' 
-              ? isDark ? 'bg-blue-500/80' : 'bg-blue-500/90' 
-              : isDark ? 'bg-gray-700/80' : 'bg-gray-200/80'
+              ? 'bg-blue-500/80' 
+              : isDark ? 'bg-white/10' : 'bg-gray-200/80'
           } rounded-2xl p-4 shadow-lg backdrop-blur-sm`}>
-            <p className="font-semibold text-sm mb-1">{msg.sender}</p>
-            <p className="text-sm leading-relaxed">{msg.content}</p>
-            <p className={`text-xs ${isDark ? 'opacity-50' : 'opacity-60'} mt-2 text-right`}>{msg.time}</p>
+            <p className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'} mb-1`}>{msg.sender}</p>
+            <p className={`text-sm leading-relaxed ${isDark ? 'text-white' : 'text-gray-900'}`}>{msg.content}</p>
+            <p className="text-xs opacity-50 mt-2 text-right">{msg.time}</p>
           </div>
         </div>
       ))}
@@ -118,17 +119,16 @@ const MessageList = ({ messages }) => {
 
 const MessageInput = () => {
   const { isDark } = useTheme();
-
   return (
-    <div className={`flex items-center ${isDark ? 'bg-gray-800/50' : 'bg-gray-200/50'} rounded-full p-2`}>
+    <div className={`flex items-center p-3 ${isDark ? 'bg-white/5' : 'bg-gray-100'} rounded-full`}>
       <input
         type="text"
         placeholder="Type a message..."
-        className={`flex-grow bg-transparent outline-none px-4 text-sm
-          ${isDark ? 'placeholder-white/40' : 'placeholder-gray-500'}`}
+        className={`flex-grow p-3 ${isDark ? 'bg-white/10 text-white placeholder-white/40' : 'bg-white text-gray-900 placeholder-gray-400'} 
+          rounded-full focus:outline-none`}
       />
       <button 
-      className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors">
+        className="ml-2 p-3 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors">
         <Send size={20} />
       </button>
     </div>
@@ -137,20 +137,20 @@ const MessageInput = () => {
 
 const RightSidebar = () => {
   const { isDark } = useTheme();
-
   return (
     <div className="w-64 space-y-4">
-      <div className={`${isDark ? 'bg-gray-900/50' : 'bg-gray-100/50'} rounded-2xl p-4`}>
-        <h3 className="font-semibold mb-2">Online Friends</h3>
+      <div className={`${isDark ? 'bg-black/30 backdrop-blur-xl' : 'bg-white/90'} rounded-2xl p-4`}>
+        <h3 className={`font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Online Friends</h3>
       </div>
-      <div className={`${isDark ? 'bg-gray-900/50' : 'bg-gray-100/50'} rounded-2xl p-4`}>
-        <h3 className="font-semibold mb-2">Recent Chats</h3>
+      <div className={`${isDark ? 'bg-black/30 backdrop-blur-xl' : 'bg-white/90'} rounded-2xl p-4`}>
+        <h3 className={`font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Recent Chats</h3>
       </div>
     </div>
   );
 };
 
 const ChatBox = () => {
+  const { currentUser } = useAuth();
   const { isDark, setIsDark } = useTheme();
   const [messages] = useState([
     { id: 1, sender: 'Alice', content: 'Hi Bob, how are you doing today?', time: '12:45' },
@@ -158,13 +158,11 @@ const ChatBox = () => {
     { id: 3, sender: 'Alice', content: "I'm good too! Just working on some new designs.", time: '12:47' },
     { id: 4, sender: 'Bob', content: "That sounds interesting! Can't wait to see what you come up with.", time: '12:48' },
   ]);
-
   const [showNotification, setShowNotification] = useState(false);
   const [notificationCount, setNotificationCount] = useState(5);
 
   const handleNotificationClick = () => {
     setShowNotification(true);
-    // Decrement notification count by 1
     setNotificationCount(prevCount => prevCount - 1);
   };
 
@@ -172,7 +170,7 @@ const ChatBox = () => {
     setShowNotification(false);
   };
 
-  return (
+  return currentUser ? (
     <div className={`relative min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} flex items-center justify-center p-8`}>
       {showNotification && (
         <Notification onClose={handleNotificationClose} />
@@ -183,11 +181,10 @@ const ChatBox = () => {
         notificationCount={notificationCount}
       />
 
-      <div className={`${isDark ? 'bg-gray-800/80' : 'bg-white/80'} 
-        backdrop-blur-xl rounded-3xl w-full max-w-6xl p-6 
-        ${isDark ? 'text-white' : 'text-gray-900'} shadow-2xl`}>
-        
-        <div className="flex justify-end mb-4">
+      <div className={`${isDark ? 'bg-black/30 backdrop-blur-xl' : 'bg-white/90'} 
+        rounded-3xl w-full max-w-6xl p-8 ${isDark ? 'text-white' : 'text-gray-900'} shadow-2xl`}>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-semibold">Hello, {currentUser.email}!</h2>
           <IconButton 
             icon={isDark ? <Sun size={20} /> : <Moon size={20} />}
             onClick={() => setIsDark(!isDark)}
@@ -195,16 +192,16 @@ const ChatBox = () => {
         </div>
 
         <div className="flex space-x-6">
-          <div className={`flex-grow ${isDark ? 'bg-gray-900/50' : 'bg-gray-100/50'} rounded-2xl p-6`}>
-            <h2 className="text-2xl font-semibold mb-4">Messages</h2>
+          <div className={`flex-grow ${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-2xl p-6`}>
             <MessageList messages={messages} />
             <MessageInput />
           </div>
-
           <RightSidebar />
         </div>
       </div>
     </div>
+  ) : (
+    <Navigate to={'/login'} />
   );
 };
 

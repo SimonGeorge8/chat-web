@@ -1,16 +1,41 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { Mail, Lock, User, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../../chat-box'; 
+import { Navigate, useNavigate } from 'react-router-dom';
+import { doCreateUserWithEmailandPassword } from '../../../firebase/auth';
+import { useAuth } from '../../../contexts/authContext';
 
 
 const Register = ({ onRegister }) => {
+  
   const { isDark, setIsDark } = useTheme();
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (onRegister) onRegister();
-  };
+  const navigate = useNavigate();
+  const { userLoggedIn } = useAuth()
 
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setconfirmPassword] = useState('')
+  const [isRegistering , setIsRegistering ] = useState(false)
+  const [errorMessage, seErrorMessaage]  = useState('')
+
+ 
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!isRegistering) {
+    setIsRegistering(true)
+    await doCreateUserWithEmailandPassword( email , password )
+  }
+};
+
+const handleConfirmPasswordChange = (e) => {
+  setconfirmPassword(e.target.value);
+  if (e.target.value !== password) {
+  //  setError('Passwords do not match');
+  } else {
+   // setError('');
+  }
+};
   const IconButton = ({ icon, onClick }) => {
     return (
       <button 
@@ -25,7 +50,10 @@ const Register = ({ onRegister }) => {
   };
 
   return (
+    
     <div className={`relative min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} flex items-center justify-center p-8`}>
+      {userLoggedIn && (<Navigate to={'/home'} replace={true} />)}
+
       {/* Chat Background Card */}
       <div className="absolute inset-0 flex justify-center items-center p-8">
         <div className={`${isDark ? 'bg-gray-800/80' : 'bg-white/80'} 
@@ -83,23 +111,14 @@ const Register = ({ onRegister }) => {
               <User size={20} className={isDark ? 'text-white/60' : 'text-gray-600'} />
               <input
                 type="text"
+                required
                 className={`flex-grow bg-transparent ${isDark ? 'text-white placeholder-white/40' : 'text-gray-900 placeholder-gray-500'}
                   focus:outline-none`}
                 placeholder="First Name"
               />
             </label>
 
-            {/* Last Name Field */}
-            <label className={`flex items-center gap-3 p-4 
-              ${isDark ? 'bg-gray-900/50' : 'bg-gray-100/50'} rounded-full`}>
-              <User size={20} className={isDark ? 'text-white/60' : 'text-gray-600'} />
-              <input
-                type="text"
-                className={`flex-grow bg-transparent ${isDark ? 'text-white placeholder-white/40' : 'text-gray-900 placeholder-gray-500'}
-                  focus:outline-none`}
-                placeholder="Last Name"
-              />
-            </label>
+
 
             {/* Email Field */}
             <label className={`flex items-center gap-3 p-4 
@@ -107,6 +126,9 @@ const Register = ({ onRegister }) => {
               <Mail size={20} className={isDark ? 'text-white/60' : 'text-gray-600'} />
               <input
                 type="email"
+                required
+                value = {email} 
+                onChange={ (e) => {setEmail(e.target.value)}}
                 className={`flex-grow bg-transparent ${isDark ? 'text-white placeholder-white/40' : 'text-gray-900 placeholder-gray-500'}
                   focus:outline-none`}
                 placeholder="Email"
@@ -119,11 +141,29 @@ const Register = ({ onRegister }) => {
               <Lock size={20} className={isDark ? 'text-white/60' : 'text-gray-600'} />
               <input
                 type="password"
+                required
+                value = {password} 
+                onChange={ (e) => {setPassword(e.target.value)}}
                 className={`flex-grow bg-transparent ${isDark ? 'text-white placeholder-white/40' : 'text-gray-900 placeholder-gray-500'}
                   focus:outline-none`}
                 placeholder="Password"
               />
             </label>
+            {/* Confirm-Password Field */}
+            <label className={`flex items-center gap-3 p-4 
+              ${isDark ? 'bg-gray-900/50' : 'bg-gray-100/50'} rounded-full`}>
+              <Lock size={20} className={isDark ? 'text-white/60' : 'text-gray-600'} />
+              <input
+                type="password"
+                required
+                value = {confirmPassword} 
+                onChange= {handleConfirmPasswordChange}
+                className={`flex-grow bg-transparent ${isDark ? 'text-white placeholder-white/40' : 'text-gray-900 placeholder-gray-500'}
+                  focus:outline-none`}
+                placeholder="Confrim Password"
+              />
+            </label>
+            
 
             {/* Submit Button */}
             <button
