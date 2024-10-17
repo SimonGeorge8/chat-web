@@ -3,8 +3,11 @@ import { Home, Search, PieChart, BellDot, Settings, MessageSquare, Send, Sun, Mo
 import { useAuth } from '../../contexts/authContext';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { doSignOut } from '../../firebase/auth';
+import firebase from 'firebase/compat/app';
+import 'firebase/firestore';
 
 const ThemeContext = createContext();
+
 
 export const ThemeProvider = ({ children }) => {
   const [isDark, setIsDark] = useState(true);
@@ -152,6 +155,9 @@ const RightSidebar = () => {
 const ChatBox = () => {
   const { currentUser } = useAuth();
   const { isDark, setIsDark } = useTheme();
+
+
+
   const [messages] = useState([
     { id: 1, sender: 'Alice', content: 'Hi Bob, how are you doing today?', time: '12:45' },
     { id: 2, sender: 'Bob', content: "Hello Alice! I'm doing great, thanks for asking. How about you?", time: '12:46' },
@@ -159,12 +165,13 @@ const ChatBox = () => {
     { id: 4, sender: 'Bob', content: "That sounds interesting! Can't wait to see what you come up with.", time: '12:48' },
   ]);
   const [showNotification, setShowNotification] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(5);
+  const [notificationCount, setNotificationCount] = useState(69);
 
   const handleNotificationClick = () => {
     setShowNotification(true);
     setNotificationCount(prevCount => prevCount - 1);
   };
+  
 
   const handleNotificationClose = () => {
     setShowNotification(false);
