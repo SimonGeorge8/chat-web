@@ -1,8 +1,8 @@
+import ForgotPassword from "./components/auth/forgotPassword";
 import Login from "./components/auth/login";
 import Register from "./components/auth/register";
-//import Header from "./components/header";
+import EmailVerification from "./components/auth/verifyEmail";
 import ChatBox from "./components/chat-box";
-
 import { AuthProvider } from "./contexts/authContext";
 import { useRoutes } from "react-router-dom";
 
@@ -33,6 +33,18 @@ function App() {
       path: "/home/new-chats",
       element: <ChatBox />,
     },
+    {
+      path: '/forgot-password',
+      element: <ForgotPassword/>
+    },
+    {
+      path: 'login/forgot-password',
+      element: <ForgotPassword/>
+    },
+    {
+      path: 'login/verifyEmail',
+      element: <EmailVerification/>
+    }
   ];
   // let because we want the value to change no like the const 
   let routesElement = useRoutes(routesArray);

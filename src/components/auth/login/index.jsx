@@ -152,7 +152,7 @@ const Login = ({ onLogin, onRegister, onGoogleLogin }) => {
           {/* Optional Links */}
           <div className="flex justify-between mt-6 text-sm">
           <button
-              onClick={ () => navigate('/register')}
+              onClick={ () => navigate('forgot-password')}
               className="text-white/60 hover:text-white transition-colors duration-200 bg-transparent border-none cursor-pointer"
             >
               Forgot password?

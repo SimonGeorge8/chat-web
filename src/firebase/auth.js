@@ -1,4 +1,4 @@
-import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, updatePassword ,GoogleAuthProvider} from "firebase/auth";
+import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, updatePassword ,GoogleAuthProvider,  applyActionCode, sendEmailVerification} from "firebase/auth";
 import { auth, db } from "./firebase";
 import { collection, addDoc } from "firebase/firestore";
 
@@ -29,7 +29,11 @@ export const doSignInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth , provider);
     const idToken = await auth.currentUser.uid
-    await addDoc(collection(db, 'user-list'), { id: idToken, email: auth.currentUser.email });
+    const snapshot = await db.collection('user-list').where('id', '==', idToken).get();
+    if (snapshot.empty) {
+        await addDoc(collection(db, 'user-list'), { id: idToken, email: auth.currentUser.email });
+    }  
+
     return result;
 };
 
@@ -44,3 +48,24 @@ export const doPasswordReset = (email) =>{
 export const doPasswordChange = (password) =>{
     return updatePassword(auth.currentUser, password);
 };
+// New functions for email verification
+export const doApplyActionCode = async (actionCode) => {
+    try {
+      await applyActionCode(auth, actionCode);
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  };
+  
+  export const doSendEmailVerification = async (user) => {
+    try {
+      if (!user) {
+        throw new Error('No user found');
+      }
+      await sendEmailVerification(user);
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  };
