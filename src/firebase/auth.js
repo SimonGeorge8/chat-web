@@ -7,7 +7,7 @@ export const doCreateUserWithEmailandPassword = async (fullName,email, password)
     try{
         const result = await createUserWithEmailAndPassword(auth, email, password);
         const idToken = await auth.currentUser.uid
-        await addDoc(collection(db, 'user-list'), {fullName: full, id: idToken, email: email.toLowerCase()  });
+        await addDoc(collection(db, 'user-list'), {fullName: fullName, id: idToken, email: email.toLowerCase()  });
         return result;
     } catch (e) {
         throw e;
