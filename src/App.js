@@ -1,7 +1,6 @@
 import ForgotPassword from "./components/auth/forgotPassword";
 import Login from "./components/auth/login";
 import Register from "./components/auth/register";
-import EmailVerification from "./components/auth/verifyEmail";
 import ChatBox from "./components/chat-box";
 import { AuthProvider } from "./contexts/authContext";
 import { useRoutes } from "react-router-dom";
@@ -42,8 +41,8 @@ function App() {
       element: <ForgotPassword/>
     },
     {
-      path: 'login/verifyEmail',
-      element: <EmailVerification/>
+     // path: 'login/verifyEmail',
+     // element: <EmailVerification/>
     }
   ];
   // let because we want the value to change no like the const 

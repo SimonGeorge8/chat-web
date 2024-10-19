@@ -101,6 +101,7 @@ const Register = () => {
       try {
         // Create the user account
         const userCredential = await doCreateUserWithEmailandPassword(
+          formData.fullName,
           formData.email, 
           formData.password
         );
@@ -186,12 +187,6 @@ const Register = () => {
                 className="w-full py-4 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 focus:outline-none transition-colors duration-200"
               >
                 Sign Out
-              </button>
-              <button
-                onClick={() => navigate('/login')}
-                className="w-full py-4 bg-white/10 text-white rounded-full shadow-lg hover:bg-white/20 focus:outline-none transition-colors duration-200"
-              >
-                Return to Login
               </button>
             </div>
           </div>

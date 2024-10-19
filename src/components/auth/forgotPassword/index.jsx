@@ -4,7 +4,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/authContext';
 import { doPasswordReset } from '../../../firebase/auth';
 import { db } from '../../../firebase/firebase';
-import { collection, addDoc } from "firebase/firestore";
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -24,15 +24,21 @@ const ForgotPassword = () => {
       setSuccessMessage('');
       
       try {
-        const snapShot = await db.collection('user-list').where('email', '==', email).get()
+
+        const userRef = collection(db, 'user-list');
+        const q = query(userRef, where('email', '==', email.toLowerCase()));
+        const snapShot = await getDocs(q);
+
         if(snapShot.empty){
             setErrorMessage('Email is not registered to database.')
+            setIsProcessing(false);
         } else {
             await doPasswordReset(email);
             setSuccessMessage('Password reset email sent! Check your inbox.');
         }
       } catch (error) {
         setErrorMessage(error.message);
+        setIsProcessing(false);
       } finally {
         setIsProcessing(false);
       }

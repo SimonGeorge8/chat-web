@@ -3,11 +3,11 @@ import { auth, db } from "./firebase";
 import { collection, addDoc } from "firebase/firestore";
 
 
-export const doCreateUserWithEmailandPassword = async (email, password) => {
+export const doCreateUserWithEmailandPassword = async (fullName,email, password) => {
     try{
         const result = await createUserWithEmailAndPassword(auth, email, password);
         const idToken = await auth.currentUser.uid
-        await addDoc(collection(db, 'user-list'), { id: idToken, email: email });
+        await addDoc(collection(db, 'user-list'), {fullName: full, id: idToken, email: email.toLowerCase()  });
         return result;
     } catch (e) {
         throw e;
@@ -64,7 +64,12 @@ export const doApplyActionCode = async (actionCode) => {
         throw new Error('No user found');
       }
       await sendEmailVerification(user);
-      return true;
+      if (user.emailVerified) {
+        console.log("Email is verified.");
+      } else {
+        return true;
+      }
+     
     } catch (error) {
       throw error;
     }
