@@ -101,7 +101,6 @@ const Register = () => {
       try {
         // Create the user account
         const userCredential = await doCreateUserWithEmailandPassword(
-          formData.fullName,
           formData.email, 
           formData.password
         );

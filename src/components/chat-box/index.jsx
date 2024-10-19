@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
-import { Home, Search, BellDot, Settings, MessageSquare, Send, Sun, Moon, LogOut } from 'lucide-react';
-import { UserCircle2, MessageCircle, Circle, Clock } from 'lucide-react';
+import { Home, Search, BellDot, Settings, MessageSquare, Send, Sun, Moon, LogOut, UserCircle2, MessageCircle, Circle, Clock } from 'lucide-react';
 import { useAuth } from '../../contexts/authContext';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { doSignOut } from '../../firebase/auth';
@@ -17,10 +16,13 @@ import {
   updateDoc,
   setDoc,
   serverTimestamp,
-  or 
+  or ,
+  and,
+  arrayUnion,
+  deleteDoc,
+  onSnapshot
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebase';
-import { useCollectionData } from 'react-firebase-hooks/firestore';
 
 const ThemeContext = createContext();
 
@@ -36,39 +38,6 @@ export const ThemeProvider = ({ children }) => {
 
 export const useTheme = () => useContext(ThemeContext);
 
-const Notification = ({ onClose, message = "You have an unread message" }) => {
-  const { isDark } = useTheme();
-  return (
-    <div role="alert" 
-      className={`fixed top-4 right-4 z-50 flex items-center gap-4 p-4 rounded-lg shadow-lg
-        ${isDark ? 'bg-black/30 backdrop-blur-xl' : 'bg-white/90'} text-white`}>
-      <svg 
-        xmlns="http://www.w3.org/2000/svg" 
-        fill="none" 
-        viewBox="0 0 24 24" 
-        className="h-6 w-6 shrink-0 stroke-blue-400"
-      >
-        <path 
-          strokeLinecap="round" 
-          strokeLinejoin="round" 
-          strokeWidth="2" 
-          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-      <div>
-        <h3 className="font-bold">New message!</h3>
-        <div className="text-xs opacity-75">{message}</div>
-      </div>
-      <button
-        onClick={onClose}
-        className="ml-4 px-2 py-1 rounded-lg text-sm font-medium
-          bg-white/10 hover:bg-white/20 transition-colors"
-      >
-        X
-      </button>
-    </div>
-  );
-};
 
 const IconButton = ({ icon, onClick, badge }) => {
   const { isDark } = useTheme();
@@ -89,31 +58,6 @@ const IconButton = ({ icon, onClick, badge }) => {
   );
 };
 
-const Sidebar = ({ onNotificationClick, notificationCount }) => {
-  const { isDark } = useTheme();
-  const navigate = useNavigate();
-  
-  return (
-    <div className={`fixed left-4 top-1/2 transform -translate-y-1/2 
-      ${isDark ? 'bg-black/30 backdrop-blur-xl' : 'bg-white/90'} 
-      shadow-lg rounded-2xl p-3 w-16 flex flex-col items-center space-y-8 z-50`}>
-      <nav className="flex flex-col space-y-8">
-        <IconButton icon={<Home size={20} />} />
-        <IconButton icon={<Search size={20} />} />
-        <IconButton 
-          icon={<BellDot size={20} />} 
-          onClick={onNotificationClick}
-          badge={notificationCount > 0 ? notificationCount : null}
-        />
-        <IconButton icon={<Settings size={20} />} />
-        <IconButton 
-          icon={<LogOut size={20} />}
-          onClick={() => { doSignOut().then(() => { navigate('/login') }) }}
-        />
-      </nav>
-    </div>
-  );
-};
 const MessageList = ({ messages, scrollRef }) => {
   const { isDark } = useTheme();
   const { currentUser } = useAuth();
@@ -142,32 +86,9 @@ const MessageList = ({ messages, scrollRef }) => {
   );
 };
 
-const ChatList = ({ onSelectChat, selectedChatId }) => {
+const ChatList = ({ chats, onSelectChat, selectedChatId }) => {
   const { isDark } = useTheme();
   const { currentUser } = useAuth();
-  const [chats, setChats] = useState([]);
-
-  useEffect(() => {
-    const fetchChats = async () => {
-      const chatsRef = collection(db, 'chats');
-      const q = query(
-        chatsRef,
-        or(
-          where('participants', 'array-contains', currentUser.uid),
-          where('participantEmails', 'array-contains', currentUser.email)
-        )
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const chatsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setChats(chatsData);
-    };
-
-    fetchChats();
-  }, [currentUser]);
 
   return (
     <div className={`${isDark ? 'bg-black/30 backdrop-blur-xl' : 'bg-white/90'} rounded-2xl p-4`}>
@@ -204,7 +125,6 @@ const ChatList = ({ onSelectChat, selectedChatId }) => {
     </div>
   );
 };
-
 const NewChatModal = ({ isOpen, onClose, onStartChat }) => {
   const { isDark } = useTheme();
   const [email, setEmail] = useState('');
@@ -254,6 +174,7 @@ const NewChatModal = ({ isOpen, onClose, onStartChat }) => {
     </div>
   );
 };
+
 const MessageInput = ({ onSendMessage }) => {
   const { isDark } = useTheme();
   const [formValue, setFormValue] = useState('');
@@ -296,19 +217,131 @@ const ChatBox = () => {
   const [selectedChat, setSelectedChat] = useState(null);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  
-  // Query messages for selected chat
-  const messagesQuery = selectedChat ? query(
-    collection(db, 'chats', selectedChat.id, 'messages'),
-    orderBy('createdAt', 'asc'),
-    limit(50)
-  ) : null;
-  
-  const [messages] = useCollectionData(messagesQuery, { idField: 'id' });
+  const [chats, setChats] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState({
+    sent: [],
+    received: []
+  });
+  const [messages, setMessages] = useState([]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Listener for accepted chats
+    const chatsRef = collection(db, 'chats');
+    const acceptedChatsQuery = query(
+      chatsRef,
+      and(
+        or(
+          where('participants', 'array-contains', currentUser.uid),
+          where('participantEmails', 'array-contains', currentUser.email)
+        ),
+        where('status', '==', 'accepted')
+      )
+    );
+
+    const unsubscribeChats = onSnapshot(acceptedChatsQuery, (snapshot) => {
+      const chatsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setChats(chatsData);
+    });
+
+    // Listener for received requests
+    const receivedRequestsQuery = query(
+      chatsRef,
+      and(
+        where('recipientEmail', '==', currentUser.email),
+        where('status', '==', 'pending')
+      )
+    );
+
+    // Listener for sent requests
+    const sentRequestsQuery = query(
+      chatsRef,
+      and(
+        where('senderEmail', '==', currentUser.email),
+        where('status', '==', 'pending')
+      )
+    );
+
+    const unsubscribeReceivedRequests = onSnapshot(receivedRequestsQuery, (snapshot) => {
+      const receivedRequests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPendingRequests(prev => ({ ...prev, received: receivedRequests }));
+    });
+
+    const unsubscribeSentRequests = onSnapshot(sentRequestsQuery, (snapshot) => {
+      const sentRequests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPendingRequests(prev => ({ ...prev, sent: sentRequests }));
+    });
+
+    return () => {
+      unsubscribeChats();
+      unsubscribeReceivedRequests();
+      unsubscribeSentRequests();
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    const messagesQuery = query(
+      collection(db, 'chats', selectedChat.id, 'messages'),
+      orderBy('createdAt', 'asc'),
+      limit(50)
+    );
+
+    const unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
+      const messagesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setMessages(messagesData);
+      scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    return () => unsubscribeMessages();
+  }, [selectedChat]);
+
+  const handleAcceptRequest = async (chatId) => {
+    try {
+      const chatRef = doc(db, 'chats', chatId);
+      await updateDoc(chatRef, {
+        status: 'accepted',
+        participants: arrayUnion(currentUser.uid)
+      });
+      setErrorMessage('Chat request accepted successfully');
+    } catch (error) {
+      console.error('Error accepting chat request:', error);
+      setErrorMessage('Failed to accept chat request. Please try again.');
+    }
+  };
+
+  const handleRejectRequest = async (chatId) => {
+    try {
+      const chatRef = doc(db, 'chats', chatId);
+      await deleteDoc(chatRef);
+      setErrorMessage('Chat request rejected');
+    } catch (error) {
+      console.error('Error rejecting chat request:', error);
+      setErrorMessage('Failed to reject chat request. Please try again.');
+    }
+  };
+
+  const handleCancelRequest = async (chatId) => {
+    try {
+      const chatRef = doc(db, 'chats', chatId);
+      await deleteDoc(chatRef);
+      setErrorMessage('Chat request cancelled');
+    } catch (error) {
+      console.error('Error cancelling chat request:', error);
+      setErrorMessage('Failed to cancel chat request. Please try again.');
+    }
+  };
 
   const createNewChat = async (otherUserEmail) => {
     try {
-      // First check if user exists
       const userSnapshot = await getDocs(
         query(collection(db, 'user-list'), where('email', '==', otherUserEmail))
       );
@@ -318,48 +351,53 @@ const ChatBox = () => {
         return;
       }
 
-      // Then check if chat already exists
       const chatSnapshot = await getDocs(
         query(
           collection(db, 'chats'),
-          where('participantEmails', 'array-contains', [otherUserEmail, currentUser.email])
+          where('participantEmails', 'array-contains', currentUser.email)
         )
       );
 
+      const existingChat = chatSnapshot.docs.find(doc => {
+        const data = doc.data();
+        return data.participantEmails.includes(otherUserEmail) && 
+               (data.status === 'accepted' || 
+               (data.status === 'pending' && data.senderEmail === currentUser.email));
+      });
 
-      if (!chatSnapshot.empty) {
-        // Get the first existing chat
-        const existingChat = chatSnapshot.docs[0];
-        setSelectedChat({
-          id: existingChat.id,
-          ...existingChat.data()
-        });
-        setErrorMessage('');
+      if (existingChat) {
+        if (existingChat.data().status === 'accepted') {
+          setSelectedChat({
+            id: existingChat.id,
+            ...existingChat.data()
+          });
+        } else {
+          setErrorMessage('Chat request already sent and pending');
+        }
         return;
       }
 
-      // Create new chat if user exists and chat doesn't exist
       const chatRef = doc(collection(db, 'chats'));
       await setDoc(chatRef, {
         participants: [currentUser.uid],
         participantEmails: [currentUser.email, otherUserEmail],
+        senderEmail: currentUser.email,
+        recipientEmail: otherUserEmail,
+        status: 'pending',
         createdAt: serverTimestamp(),
         lastMessage: null,
         lastMessageAt: null
       });
 
-      // Set the new chat as selected
-      const chatData = await getDoc(chatRef);
-      setSelectedChat({
-        id: chatRef.id,
-        ...chatData.data()
-      });
-      setErrorMessage('');
-      
+      setErrorMessage('Chat request sent successfully');
     } catch (error) {
-      console.error('Error creating new chat:', error);
-      setErrorMessage('Failed to create chat. Please try again.');
+      console.error('Error creating chat request:', error);
+      setErrorMessage('Failed to send chat request. Please try again.');
     }
+  };
+
+  const getOtherParticipantEmail = (chat) => {
+    return chat?.participantEmails?.find(email => email !== currentUser.email) || '';
   };
 
   const handleSendMessage = async (messageContent) => {
@@ -374,23 +412,28 @@ const ChatBox = () => {
         createdAt: serverTimestamp()
       });
 
-      // Update last message in chat document
       const chatRef = doc(db, 'chats', selectedChat.id);
       await updateDoc(chatRef, {
         lastMessage: messageContent,
         lastMessageAt: serverTimestamp()
       });
-
-      scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
       console.error('Error sending message:', error);
       setErrorMessage('Failed to send message. Please try again.');
     }
   };
+  const handleSignOut = async () => {
+    try {
+      await doSignOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      setErrorMessage('Failed to sign out. Please try again.');
+    }
+  };
 
   return currentUser ? (
     <div className={`relative min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} flex items-center justify-center p-8`}>
-        <Sidebar/>
       <NewChatModal
         isOpen={showNewChatModal}
         onClose={() => {
@@ -403,7 +446,11 @@ const ChatBox = () => {
       <div className={`${isDark ? 'bg-black/30 backdrop-blur-xl' : 'bg-white/90'} 
         rounded-3xl w-full max-w-6xl p-8 ${isDark ? 'text-white' : 'text-gray-900'} shadow-2xl`}>
         {errorMessage && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-3 rounded-lg mb-6 text-sm">
+          <div className={`${
+            errorMessage.includes('successfully') || errorMessage.includes('rejected') || errorMessage.includes('cancelled')
+              ? 'bg-green-500/10 border border-green-500/50 text-green-500'
+              : 'bg-red-500/10 border border-red-500/50 text-red-500'
+          } p-3 rounded-lg mb-6 text-sm`}>
             {errorMessage}
           </div>
         )}
@@ -411,6 +458,10 @@ const ChatBox = () => {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold">Chat App</h2>
           <div className="flex items-center gap-4">
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}>
+              <UserCircle2 size={20} />
+              <span className="text-sm font-medium">{currentUser.email}</span>
+            </div>
             <button
               onClick={() => setShowNewChatModal(true)}
               className="px-4 py-2 rounded-lg bg-blue-500 text-white flex items-center gap-2"
@@ -422,12 +473,87 @@ const ChatBox = () => {
               icon={isDark ? <Sun size={20} /> : <Moon size={20} />}
               onClick={() => setIsDark(!isDark)}
             />
+            <button
+              onClick={handleSignOut}
+              className={`px-4 py-2 rounded-lg ${isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'} flex items-center gap-2 transition-colors`}
+            >
+              <LogOut size={20} />
+              <span className="text-sm font-medium">Sign Out</span>
+            </button>
           </div>
         </div>
 
         <div className="flex space-x-6">
-          <div className="w-64">
+          <div className="w-64 space-y-6">
+            {(pendingRequests.received.length > 0 || pendingRequests.sent.length > 0) && (
+              <div className={`${isDark ? 'bg-black/30 backdrop-blur-xl' : 'bg-white/90'} rounded-2xl p-4`}>
+                <h3 className={`font-semibold mb-4 ${isDark ? 'text-white' : 'text-gray-900'} flex items-center gap-2`}>
+                  <BellDot className="w-5 h-5" />
+                  Chat Requests
+                </h3>
+                
+                {pendingRequests.received.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className={`text-sm font-medium mb-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                      Received Requests
+                    </h4>
+                    <div className="space-y-3">
+                      {pendingRequests.received.map((request) => (
+                        <div key={request.id} className={`p-3 rounded-lg ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}>
+                          <p className={`text-sm mb-2 ${isDark ? 'text-white/90' : 'text-gray-700'}`}>
+                            From: {request.senderEmail}
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleAcceptRequest(request.id)}
+                              className="px-3 py-1 rounded bg-green-500 text-white text-sm"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleRejectRequest(request.id)}
+                              className="px-3 py-1 rounded bg-red-500 text-white text-sm"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {pendingRequests.sent.length > 0 && (
+                  <div>
+                    <h4 className={`text-sm font-medium mb-2 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                      Sent Requests
+                    </h4>
+                    <div className="space-y-3">
+                      {pendingRequests.sent.map((request) => (
+                        <div key={request.id} className={`p-3 rounded-lg ${isDark ? 'bg-white/10' : 'bg-gray-100'}`}>
+                          <p className={`text-sm mb-2 ${isDark ? 'text-white/90' : 'text-gray-700'}`}>
+                            To: {request.recipientEmail}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-yellow-500" />
+                            <span className="text-sm text-yellow-500">Pending</span>
+                            <button
+                              onClick={() => handleCancelRequest(request.id)}
+                              className="ml-auto px-3 py-1 rounded bg-gray-500 text-white text-sm"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
             <ChatList
+              chats={chats}
               onSelectChat={setSelectedChat}
               selectedChatId={selectedChat?.id}
             />
@@ -436,6 +562,13 @@ const ChatBox = () => {
           <div className={`flex-grow ${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-2xl p-6`}>
             {selectedChat ? (
               <>
+                <div className={`mb-4 p-4 ${isDark ? 'bg-white/10' : 'bg-gray-100'} rounded-lg`}>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <UserCircle2 className="w-6 h-6" />
+                    {getOtherParticipantEmail(selectedChat)}
+
+                  </h3>
+                </div>
                 <MessageList messages={messages} scrollRef={scrollRef} />
                 <MessageInput onSendMessage={handleSendMessage} />
               </>
