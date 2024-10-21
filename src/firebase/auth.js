@@ -1,13 +1,14 @@
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, updatePassword ,GoogleAuthProvider,  applyActionCode, sendEmailVerification} from "firebase/auth";
 import { auth, db } from "./firebase";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, where ,get, updateDoc } from "firebase/firestore";
+import {  addDoc } from "firebase/firestore";
 
 
 export const doCreateUserWithEmailandPassword = async (email, password) => {
     try{
         const result = await createUserWithEmailAndPassword(auth, email, password);
         const idToken = await auth.currentUser.uid
-        await addDoc(collection(db, 'user-list'), {id: idToken, email: email.toLowerCase()  });
+        await addDoc(collection(db, 'user-list'), {id: idToken, email: email.toLowerCase()});
         return result;
     } catch (e) {
         throw e;
@@ -18,6 +19,9 @@ export const doCreateUserWithEmailandPassword = async (email, password) => {
 export const doSignInWithEmailandPassword = async (email, password) => {
     try {
         const result = await signInWithEmailAndPassword(auth, email, password);
+        const idToken = await auth.currentUser.uid
+        const snapshot = await db.collection('user-list').where('id', '==', idToken).get();
+        //await updateDoc( snapshot, {Active : true})
         return result;
     } catch (error) {
         throw error;
@@ -37,8 +41,12 @@ export const doSignInWithGoogle = async () => {
     return result;
 };
 
-export const doSignOut = () => {
-    return auth.signOut();
+export const doSignOut = async () => {
+  const result = auth.signOut();
+  const idToken = await auth.currentUser.uid
+  const snapshot = await db.collection('user-list').where('id', '==', idToken).get();
+  await updateDoc( snapshot, {Active : true})
+  return result
 };
 
 export const doPasswordReset = (email) =>{

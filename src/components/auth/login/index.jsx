@@ -23,12 +23,14 @@ const Login = ({ onLogin, onRegister, onGoogleLogin }) => {
       setisSigningIn(true)
       try{
       await doSignInWithEmailandPassword( email , password )
+
       } catch(error) {
         setErrorMessaage(error.message);
         setisSigningIn(false);
       }
     }
   };
+
 
 
   const onGoogleSignIn = async (e) => {
