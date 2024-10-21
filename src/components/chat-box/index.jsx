@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import { encrypt, decrypt} from '../../contexts/encyptionAlgorithm';
 import { Home, Search, BellDot, Settings, MessageSquare, Send, Sun, Moon, LogOut, UserCircle2, MessageCircle, Circle, Clock } from 'lucide-react';
 import { useAuth } from '../../contexts/authContext';
 import { useNavigate, Navigate } from 'react-router-dom';
@@ -38,7 +39,41 @@ export const ThemeProvider = ({ children }) => {
 
 export const useTheme = () => useContext(ThemeContext);
 
+const handleGetEncryptionKey = async(alicePublicKey, bobPrivateKey,setErrorMessage,setSharedSecretKey) => {
+  try {
+    await sodium.ready;
+    const sodium = sodium;
+    const serverSharedSecret = sodium.crypto_kx_server_session_keys(
+      sodium.crypto_scalarmult_base(sodium.from_hex(bobPrivateKey)),
+      sodium.from_hex(bobPrivateKey),
+      sodium.from_hex(alicePublicKey)
+    );
+    console.log(
+      "Encryption Key: ",
+      sodium.to_hex(serverSharedSecret.sharedRx)
+    );
+    setSharedSecretKey(sodium.to_hex(serverSharedSecret.sharedRx));
+  } catch (error) {
+    setErrorMessage(error)
+  }
+}
 
+
+ const handleGetDecryptionKey = async (bobPublicKey, alicePrivateKey,setErrorMessage,setSharedSecretKey) => {
+  try {
+    await sodium.ready;
+    const sodium = sodium;
+    const clientSharedSecret = sodium.crypto_kx_client_session_keys(
+      sodium.crypto_scalarmult_base(sodium.from_hex(alicePrivateKey)),
+      sodium.from_hex(alicePrivateKey),
+      sodium.from_hex(bobPublicKey)
+    );
+
+    setSharedSecretKey(sodium.to_hex(clientSharedSecret.sharedTx));
+  } catch (error) {
+    setErrorMessage(error)
+  }
+}
 const IconButton = ({ icon, onClick, badge }) => {
   const { isDark } = useTheme();
   return (
@@ -214,6 +249,7 @@ const ChatBox = () => {
   const { isDark, setIsDark } = useTheme();
   const scrollRef = useRef();
   const navigate = useNavigate();
+
   const [selectedChat, setSelectedChat] = useState(null);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -223,6 +259,8 @@ const ChatBox = () => {
     received: []
   });
   const [messages, setMessages] = useState([]);
+  const [sharedSecretKey, setSharedSecretKey] = useState('');
+  const [encryptionInitialized, setEncryptionInitialized] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -247,6 +285,8 @@ const ChatBox = () => {
       }));
       setChats(chatsData);
     });
+
+    
 
     // Listener for received requests
     const receivedRequestsQuery = query(
@@ -351,6 +391,8 @@ const ChatBox = () => {
         return;
       }
 
+      const otherUser = userSnapshot.docs[0].data();
+
       const chatSnapshot = await getDocs(
         query(
           collection(db, 'chats'),
@@ -367,6 +409,9 @@ const ChatBox = () => {
 
       if (existingChat) {
         if (existingChat.data().status === 'accepted') {
+          // Initialize encryption for existing chat
+          await handleGetEncryptionKey(otherUser.publicKey, currentUser.privateKey, setErrorMessage, setSharedSecretKey);
+          setEncryptionInitialized(true);
           setSelectedChat({
             id: existingChat.id,
             ...existingChat.data()
@@ -377,6 +422,7 @@ const ChatBox = () => {
         return;
       }
 
+      // Create new chat with encryption keys
       const chatRef = doc(collection(db, 'chats'));
       await setDoc(chatRef, {
         participants: [currentUser.uid],
@@ -386,7 +432,11 @@ const ChatBox = () => {
         status: 'pending',
         createdAt: serverTimestamp(),
         lastMessage: null,
-        lastMessageAt: null
+        lastMessageAt: null,
+        publicKeys: {
+          [currentUser.uid]: currentUser.publicKey,
+          [otherUser.uid]: otherUser.publicKey
+        }
       });
 
       setErrorMessage('Chat request sent successfully');
@@ -404,6 +454,7 @@ const ChatBox = () => {
     if (!selectedChat || !messageContent.trim()) return;
 
     try {
+      //Here ADD E2EE 
       const messagesRef = collection(db, 'chats', selectedChat.id, 'messages');
       await addDoc(messagesRef, {
         content: messageContent,
