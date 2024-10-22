@@ -314,7 +314,7 @@ const ChatBox = () => {
       });
       setErrorMessage('Chat request accepted successfully');
     } catch (error) {
-      console.error('Error accepting chat request:', error);
+      //console.error('Error accepting chat request:', error);
       setErrorMessage('Failed to accept chat request. Please try again.');
     }
   };
@@ -350,6 +350,12 @@ const ChatBox = () => {
     try {
       // Convert email to lowercase and trim whitespace for consistency
       const trimmedEmail = otherUserEmail.toLowerCase().trim();
+      
+      // Don't allow chatting with yourself
+      if (trimmedEmail === currentUser.email) {
+        setErrorMessage('Cannot start a chat with yourself');
+        return;
+      }
   
       // Check if the other user exists
       const userQuery = query(
@@ -363,47 +369,59 @@ const ChatBox = () => {
         return;
       }
   
-      // Check for existing chats where the current user is a participant
+      // Check for existing chats with either participant
       const chatQuery = query(
         collection(db, 'chats'),
         where('participantEmails', 'array-contains', currentUser.email)
       );
       const chatSnapshot = await getDocs(chatQuery);
   
-      // Find accepted chat with the other user
-      const acceptedChat = chatSnapshot.docs.find((doc) => {
+      // Check for existing accepted chat
+      const existingChat = chatSnapshot.docs.find(doc => {
         const data = doc.data();
-        return (
-          data.participantEmails.includes(trimmedEmail) && 
-          data.status === 'accepted'
-        );
+        return data.participantEmails.includes(trimmedEmail) && 
+               data.status === 'accepted';
       });
   
-      if (acceptedChat) {
+      if (existingChat) {
         setSelectedChat({
-          id: acceptedChat.id,
-          ...acceptedChat.data()
+          id: existingChat.id,
+          ...existingChat.data()
         });
+        setShowNewChatModal(false);
         setErrorMessage('');
         return;
       }
   
-      // Check for pending requests sent by the current user
-      const pendingChat = chatSnapshot.docs.find((doc) => {
+      // Check for existing pending request
+      const pendingRequest = chatSnapshot.docs.find(doc => {
         const data = doc.data();
-        return (
-          data.participantEmails.includes(trimmedEmail) && 
-          data.status === 'pending' && 
-          data.senderEmail === currentUser.email
-        );
+        return data.participantEmails.includes(trimmedEmail) && 
+               data.status === 'pending';
       });
   
-      if (pendingChat) {
-        setErrorMessage('Chat request already sent and pending');
+      if (pendingRequest) {
+        setErrorMessage('A chat request with this user is already pending');
         return;
       }
   
-      // Create a new chat document
+      // Check if there's a pending request from the other user
+      const incomingRequestQuery = query(
+        collection(db, 'chats'),
+        and(
+          where('senderEmail', '==', trimmedEmail),
+          where('recipientEmail', '==', currentUser.email),
+          where('status', '==', 'pending')
+        )
+      );
+      const incomingRequestSnapshot = await getDocs(incomingRequestQuery);
+  
+      if (!incomingRequestSnapshot.empty) {
+        setErrorMessage('This user has already sent you a chat request');
+        return;
+      }
+  
+      // Create new chat document
       const newChatData = {
         participants: [currentUser.uid],
         participantEmails: [currentUser.email, trimmedEmail],
@@ -415,14 +433,13 @@ const ChatBox = () => {
         lastMessageAt: null,
       };
   
-      // Create new document in the 'chats' collection
-      await addDoc(collection(db, 'chats'), newChatData);
-  
+      const chatRef = await addDoc(collection(db, 'chats'), newChatData);
+      
+      setShowNewChatModal(false);
       setErrorMessage('Chat request sent successfully');
     } catch (error) {
       console.error('Error creating chat request:', error);
       setErrorMessage('Failed to send chat request. Please try again.');
-      throw error;
     }
   };
   
@@ -435,7 +452,6 @@ const ChatBox = () => {
     if (!selectedChat || !messageContent.trim()) return;
 
     try {
-      //Here ADD E2EE 
       const messagesRef = collection(db, 'chats', selectedChat.id, 'messages');
       await addDoc(messagesRef, {
         content: messageContent,
