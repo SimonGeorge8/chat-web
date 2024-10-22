@@ -222,9 +222,7 @@ const ChatBox = () => {
     received: []
   });
   const [messages, setMessages] = useState([]);
-  const [sharedSecretKey, setSharedSecretKey] = useState('');
-  const [encryptionInitialized, setEncryptionInitialized] = useState(false);
-
+  
   useEffect(() => {
     if (!currentUser) return;
 
