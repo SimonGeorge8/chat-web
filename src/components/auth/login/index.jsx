@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/authContext';
-import { doCreateUserWithEmailandPassword, doSignInWithEmailandPassword, doSignInWithGoogle } from '../../../firebase/auth';
+import {  doSignInWithEmailandPassword, doSignInWithGoogle } from '../../../firebase/auth';
 
 
 

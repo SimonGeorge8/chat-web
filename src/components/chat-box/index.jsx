@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
-import { encrypt, decrypt} from '../../contexts/encyptionAlgorithm';
-import { Home, Search, BellDot, Settings, MessageSquare, Send, Sun, Moon, LogOut, UserCircle2, MessageCircle, Circle, Clock } from 'lucide-react';
+import {  BellDot, MessageSquare, Send, Sun, Moon, LogOut, UserCircle2, MessageCircle, Clock } from 'lucide-react';
 import { useAuth } from '../../contexts/authContext';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { doSignOut } from '../../firebase/auth';
@@ -13,9 +12,7 @@ import {
   limit, 
   addDoc,
   getDocs,
-  getDoc,
   updateDoc,
-  setDoc,
   serverTimestamp,
   or ,
   and,
@@ -39,41 +36,7 @@ export const ThemeProvider = ({ children }) => {
 
 export const useTheme = () => useContext(ThemeContext);
 
-const handleGetEncryptionKey = async(alicePublicKey, bobPrivateKey,setErrorMessage,setSharedSecretKey) => {
-  try {
-    await sodium.ready;
-    const sodium = sodium;
-    const serverSharedSecret = sodium.crypto_kx_server_session_keys(
-      sodium.crypto_scalarmult_base(sodium.from_hex(bobPrivateKey)),
-      sodium.from_hex(bobPrivateKey),
-      sodium.from_hex(alicePublicKey)
-    );
-    console.log(
-      "Encryption Key: ",
-      sodium.to_hex(serverSharedSecret.sharedRx)
-    );
-    setSharedSecretKey(sodium.to_hex(serverSharedSecret.sharedRx));
-  } catch (error) {
-    setErrorMessage(error)
-  }
-}
 
-
- const handleGetDecryptionKey = async (bobPublicKey, alicePrivateKey,setErrorMessage,setSharedSecretKey) => {
-  try {
-    await sodium.ready;
-    const sodium = sodium;
-    const clientSharedSecret = sodium.crypto_kx_client_session_keys(
-      sodium.crypto_scalarmult_base(sodium.from_hex(alicePrivateKey)),
-      sodium.from_hex(alicePrivateKey),
-      sodium.from_hex(bobPublicKey)
-    );
-
-    setSharedSecretKey(sodium.to_hex(clientSharedSecret.sharedTx));
-  } catch (error) {
-    setErrorMessage(error)
-  }
-}
 const IconButton = ({ icon, onClick, badge }) => {
   const { isDark } = useTheme();
   return (
