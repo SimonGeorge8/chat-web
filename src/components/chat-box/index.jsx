@@ -381,70 +381,90 @@ const ChatBox = () => {
   };
 
   const createNewChat = async (otherUserEmail) => {
+    if (!otherUserEmail?.trim()) {
+      setErrorMessage('Please provide a valid email address');
+      return;
+    }
+  
     try {
-      const userSnapshot = await getDocs(
-        query(collection(db, 'user-list'), where('email', '==', otherUserEmail))
+      // Convert email to lowercase and trim whitespace for consistency
+      const trimmedEmail = otherUserEmail.toLowerCase().trim();
+  
+      // Check if the other user exists
+      const userQuery = query(
+        collection(db, 'user-list'), 
+        where('email', '==', trimmedEmail)
       );
-
+      const userSnapshot = await getDocs(userQuery);
+  
       if (userSnapshot.empty) {
         setErrorMessage('User does not exist');
         return;
       }
-
-      const otherUser = userSnapshot.docs[0].data();
-
-      const chatSnapshot = await getDocs(
-        query(
-          collection(db, 'chats'),
-          where('participantEmails', 'array-contains', currentUser.email)
-        )
+  
+      // Check for existing chats where the current user is a participant
+      const chatQuery = query(
+        collection(db, 'chats'),
+        where('participantEmails', 'array-contains', currentUser.email)
       );
-
-      const existingChat = chatSnapshot.docs.find(doc => {
+      const chatSnapshot = await getDocs(chatQuery);
+  
+      // Find accepted chat with the other user
+      const acceptedChat = chatSnapshot.docs.find((doc) => {
         const data = doc.data();
-        return data.participantEmails.includes(otherUserEmail) && 
-               (data.status === 'accepted' || 
-               (data.status === 'pending' && data.senderEmail === currentUser.email));
+        return (
+          data.participantEmails.includes(trimmedEmail) && 
+          data.status === 'accepted'
+        );
       });
-
-      if (existingChat) {
-        if (existingChat.data().status === 'accepted') {
-          // Initialize encryption for existing chat
-          await handleGetEncryptionKey(otherUser.publicKey, currentUser.privateKey, setErrorMessage, setSharedSecretKey);
-          setEncryptionInitialized(true);
-          setSelectedChat({
-            id: existingChat.id,
-            ...existingChat.data()
-          });
-        } else {
-          setErrorMessage('Chat request already sent and pending');
-        }
+  
+      if (acceptedChat) {
+        setSelectedChat({
+          id: acceptedChat.id,
+          ...acceptedChat.data()
+        });
+        setErrorMessage('');
         return;
       }
-
-      // Create new chat with encryption keys
-      const chatRef = doc(collection(db, 'chats'));
-      await setDoc(chatRef, {
+  
+      // Check for pending requests sent by the current user
+      const pendingChat = chatSnapshot.docs.find((doc) => {
+        const data = doc.data();
+        return (
+          data.participantEmails.includes(trimmedEmail) && 
+          data.status === 'pending' && 
+          data.senderEmail === currentUser.email
+        );
+      });
+  
+      if (pendingChat) {
+        setErrorMessage('Chat request already sent and pending');
+        return;
+      }
+  
+      // Create a new chat document
+      const newChatData = {
         participants: [currentUser.uid],
-        participantEmails: [currentUser.email, otherUserEmail],
+        participantEmails: [currentUser.email, trimmedEmail],
         senderEmail: currentUser.email,
-        recipientEmail: otherUserEmail,
+        recipientEmail: trimmedEmail,
         status: 'pending',
         createdAt: serverTimestamp(),
         lastMessage: null,
         lastMessageAt: null,
-        publicKeys: {
-          [currentUser.uid]: currentUser.publicKey,
-          [otherUser.uid]: otherUser.publicKey
-        }
-      });
-
+      };
+  
+      // Create new document in the 'chats' collection
+      await addDoc(collection(db, 'chats'), newChatData);
+  
       setErrorMessage('Chat request sent successfully');
     } catch (error) {
       console.error('Error creating chat request:', error);
       setErrorMessage('Failed to send chat request. Please try again.');
+      throw error;
     }
   };
+  
 
   const getOtherParticipantEmail = (chat) => {
     return chat?.participantEmails?.find(email => email !== currentUser.email) || '';
